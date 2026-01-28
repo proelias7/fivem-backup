@@ -1,11 +1,10 @@
 {
   "name": "fivem-backup",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Aplicação de backup de bases de dados para fivem",
   "main": "app.js",
   "dependencies": {
     "@types/node": "^18.7.17",
-    "archiver": "^7.0.1",
     "axios": "^1.7.7",
     "bufferjs": "^3.0.1",
     "cardinal": "^2.1.1",

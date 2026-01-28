@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
+const { pipeline } = require('stream/promises');
 const mysql = require('mysql2/promise');
 const axios = require('axios');
 const FormData = require('form-data');
-const archiver = require('archiver');
 
 const basePath = GetResourcePath(GetCurrentResourceName());
 
@@ -84,7 +85,8 @@ const startBackup = async () => {
         const files = await fs.promises.readdir(pathDB);
         for (const file of files) {
             const filePath = path.join(pathDB, file);
-            const [day, month, year, hour, minute] = file.split('.sql')[0].split('-');
+            const baseName = file.replace(/\.(sql|sql\.gz|gz)$/, '');
+            const [day, month, year, hour, minute] = baseName.split('-');
             const fileDate = new Date(year, month - 1, day, hour, minute);
 
             if (fileDate < thirtyDaysAgo) {
@@ -144,51 +146,38 @@ const startBackup = async () => {
         logger('sucesso',`Backup realizado com sucesso!`);
 
         if (config.webhook !== "") {
+            const outputGzPath = path.join(pathDB, `${datetime}.sql.gz`);
 
-            const zip = archiver('zip', {
-                zlib: { level: 9 }
-            });
-            
-            const outputZipPath = path.join(pathDB, `${datetime}.zip`);
-            
-            const output = fs.createWriteStream(outputZipPath);
-            
-            zip.on('error', (err) => {
-                logger('negado', `Erro ao compactar arquivos:\n${err.message}`);
-            });
-            
-            output.on('close', async () => {
+            try {
+                const gzip = zlib.createGzip({ level: 9 });
+                const source = fs.createReadStream(local);
+                const destination = fs.createWriteStream(outputGzPath);
+
+                await pipeline(source, gzip, destination);
+
                 const formData = new FormData();
-            
+
                 formData.append('payload_json', JSON.stringify({
                     content: `Backup realizado com sucesso!`
                 }));
-            
-                formData.append('file', fs.createReadStream(outputZipPath));
-            
-                try {
-                    await axios.post(config.webhook, formData, { 
-                        headers: formData.getHeaders(),
-                        maxContentLength: Infinity,
-                        maxBodyLength: Infinity, 
-                        timeout: 300000             
-                    });
-                    
-                    logger('sucesso', `Backup salvo na nuvem!`);
 
-                    fs.unlink(outputZipPath, (err) => {
-                        if (err) logger('negado', `Erro ao deletar arquivo zip: ${err.message}`);
-                    });
-                } catch (error) {
-                    logger('negado', `Erro ao enviar backup para a nuvem: ${error.message}`);
-                }
-            });
-            
-            zip.append(fs.createReadStream(local), { name: `${datetime}.sql` });
-            
-            zip.pipe(output);
-            
-            zip.finalize();
+                formData.append('file', fs.createReadStream(outputGzPath), {
+                    filename: `${datetime}.sql.gz`
+                });
+
+                await axios.post(config.webhook, formData, {
+                    headers: formData.getHeaders(),
+                    maxContentLength: Infinity,
+                    maxBodyLength: Infinity,
+                    timeout: 300000
+                });
+
+                logger('sucesso', `Backup salvo na nuvem!`);
+
+                await fs.promises.unlink(outputGzPath);
+            } catch (error) {
+                logger('negado', `Erro ao compactar/enviar backup: ${error.message}`);
+            }
         }
 
         const now = new Date();

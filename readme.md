@@ -1,45 +1,129 @@
 # FiveM Backup
 
-Este é um projeto aberto e gratuito desenvolvido pelo para facilitar o processo de backup automático de bancos de dados MySQL em servidores FiveM. A principal função do script é realizar backups periódicos do banco de dados do servidor, compactar os arquivos gerados e enviá-los para armazenamento externo por meio de um webhook. Dessa forma, garante-se a segurança e integridade dos dados, permitindo que eles sejam recuperados facilmente em caso de falhas ou perdas.
+![Version](https://img.shields.io/badge/version-1.1-blue)
+![License](https://img.shields.io/badge/license-ISC-green)
+![FiveM](https://img.shields.io/badge/FiveM-Compatible-orange)
 
-O projeto foi desenvolvido com o objetivo de ser uma ferramenta prática, simples de configurar e eficiente, sem depender de ferramentas proprietárias ou complexas. Todos os recursos fornecidos são totalmente gratuitos, permitindo que qualquer administrador de servidor FiveM implemente o sistema de backup com facilidade e flexibilidade.
+Sistema de backup automático de banco de dados MySQL para servidores FiveM. Realiza backups periódicos, compacta em **gzip** (menor tamanho possível) e envia para o Discord via webhook.
 
-Sinta-se à vontade para contribuir, modificar e adaptar o código às suas necessidades específicas. O objetivo é manter a comunidade forte e oferecer soluções de código aberto para os desafios diários do gerenciamento de servidores FiveM.
+## Funcionalidades
+
+- Backup automático do banco de dados MySQL
+- Compressão **gzip** com nível máximo (ideal para Discord)
+- Envio automático via webhook do Discord
+- Retenção configurável de backups antigos
+- Intervalo de backup personalizável
+- Comando manual para backup imediato
+- Logs coloridos no console
 
 ## Requisitos
-- [`Node.js`](https://nodejs.org/en/download/prebuilt-installer)
-- Servidor FiveM
+
+- [Node.js](https://nodejs.org/en/download/prebuilt-installer) (v16+)
+- Servidor FiveM com `mysql_connection_string` configurada
+- Webhook do Discord (opcional, para backup na nuvem)
 
 ## Instalação
 
-1. **Instale as dependências necessárias**. No diretório do recurso, rode o comando:
-   ```bash
-   npm install
-2. **Crie a build compativel com fivem**.
-    ```bash
-    npm run build
-    ```
-   - Será gerado em `Q_backup` os arquivos.
-3. **configure o arquivo `config.json` com suas configurações:**
+### 1. Clone o repositório
 
-    ```json
-    {
-        "webhook": "",
-        "retention": 10,
-        "interval": 4
-    }
-    ```
-    ### Explicação dos campos do `config.json`:
+```bash
+git clone https://github.com/proelias7/fivem-backup.git
+cd fivem-backup
+```
 
-    - `webhook`: Link do webhook onde será enviado a copía do backup.
-    - `retention`: O número de dias para manter os backups antes de excluí-los. Por exemplo, `10` dias.
-    - `interval` Intervalo de horas que será feito o backups.
-4. **Comando para gerar backup manualmente**
-    ```bash
-    /backupdb
-    ```
-5. **Instalando resource na base**
-    - Copie a pasta `Q_backup` do projeto para dentro das resources da base e coloca para iniciar no seu `.cfg`.
+### 2. Instale as dependências
 
-# Autor
-Proelias7 by [`Quantic Store`](https://discord.gg/Qqe5a3J58J)
+```bash
+npm install
+```
+
+### 3. Gere a build para FiveM
+
+```bash
+npm run build
+```
+
+Os arquivos serão gerados na pasta `Q_backup`.
+
+### 4. Configure o `config.json`
+
+Edite o arquivo `Q_backup/config.json`:
+
+```json
+{
+    "webhook": "https://discord.com/api/webhooks/...",
+    "retention": 10,
+    "interval": 4
+}
+```
+
+| Campo | Descrição |
+|-------|-----------|
+| `webhook` | URL do webhook do Discord para envio do backup. Deixe vazio `""` para desativar |
+| `retention` | Número de dias para manter os backups locais antes de excluí-los |
+| `interval` | Intervalo em **horas** entre cada backup automático |
+
+### 5. Instale o resource no servidor
+
+1. Copie a pasta `Q_backup` para a pasta `resources` do seu servidor FiveM
+2. Adicione no seu `server.cfg`:
+
+```cfg
+ensure Q_backup
+```
+
+## Uso
+
+### Backup Automático
+
+O backup é executado automaticamente no intervalo configurado (padrão: 4 horas).
+
+### Backup Manual
+
+Execute o comando no console do servidor:
+
+```
+backupdb
+```
+
+## Estrutura do Backup
+
+Os backups são salvos em `Q_backup/backups/` com o formato:
+
+```
+DD-MM-YYYY-HH-MM.sql      # Backup local
+DD-MM-YYYY-HH-MM.sql.gz   # Enviado para Discord (comprimido)
+```
+
+## Changelog
+
+### v1.1
+- Migração de `.zip` para `.gz` (gzip) - arquivos até 70% menores
+- Compressão nível máximo (level 9)
+- Remoção da dependência `archiver` (usa `zlib` nativo)
+- Melhor tratamento de erros no envio para Discord
+- Suporte a arquivos `.gz` na limpeza de backups antigos
+
+### v1.0
+- Release inicial
+- Backup automático MySQL
+- Envio via webhook Discord
+- Sistema de retenção de backups
+
+## Contribuição
+
+Sinta-se à vontade para abrir issues, enviar pull requests ou sugerir melhorias. O projeto é open-source e toda contribuição é bem-vinda!
+
+## Suporte
+
+Precisa de ajuda? Entre no nosso Discord:
+
+[![Discord](https://img.shields.io/badge/Discord-Quantic%20Store-5865F2?logo=discord&logoColor=white)](https://discord.gg/Qqe5a3J58J)
+
+## Autor
+
+Desenvolvido por **Proelias7** - [Quantic Store](https://discord.gg/Qqe5a3J58J)
+
+## Licença
+
+Este projeto está sob a licença ISC. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
