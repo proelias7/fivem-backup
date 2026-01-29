@@ -46,6 +46,16 @@ function parseMysqlConnectionString(connectionString) {
             port: params.get('port') || '3306',
             charset: params.get('charset') || 'utf8mb4'
         };
+    } else if (connectionString.startsWith('user=')) {
+        const params = new URLSearchParams(connectionString.replace(/;/g, '&'));
+        connectionConfig = {
+            host: params.get('host') || params.get('server') || 'localhost',
+            user: params.get('user'),
+            password: params.get('password'),
+            database: params.get('database'),
+            port: params.get('port') || '3306',
+            charset: params.get('charset') || 'utf8mb4'
+        };
     } else {
         logger('negado','Formato de string de conexão desconhecido.');
     }
