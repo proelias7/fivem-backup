@@ -3,8 +3,6 @@ const path = require('path');
 const zlib = require('zlib');
 const { pipeline } = require('stream/promises');
 const mysql = require('mysql2/promise');
-const axios = require('axios');
-const FormData = require('form-data');
 
 const basePath = GetResourcePath(GetCurrentResourceName());
 
@@ -64,6 +62,39 @@ function parseMysqlConnectionString(connectionString) {
 }
 
 let backupTimeout;
+const MINUTE_IN_MS = 60 * 1000;
+
+async function sendBackupToWebhook(webhookUrl, filePath, fileName) {
+    if (typeof fetch !== 'function' || typeof FormData !== 'function' || typeof Blob !== 'function') {
+        throw new Error('Runtime atual nao suporta fetch/FormData nativos.');
+    }
+
+    const fileBuffer = await fs.promises.readFile(filePath);
+    const formData = new FormData();
+
+    formData.append('payload_json', JSON.stringify({
+        content: 'Backup realizado com sucesso!'
+    }));
+    formData.append('file', new Blob([fileBuffer], { type: 'application/gzip' }), fileName);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000);
+
+    try {
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            const responseBody = await response.text();
+            throw new Error(`Webhook retornou ${response.status}: ${responseBody}`);
+        }
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 const startBackup = async () => {
     const mysqlConnectionString = GetConvar("mysql_connection_string", "");
@@ -165,22 +196,7 @@ const startBackup = async () => {
 
                 await pipeline(source, gzip, destination);
 
-                const formData = new FormData();
-
-                formData.append('payload_json', JSON.stringify({
-                    content: `Backup realizado com sucesso!`
-                }));
-
-                formData.append('file', fs.createReadStream(outputGzPath), {
-                    filename: `${datetime}.sql.gz`
-                });
-
-                await axios.post(config.webhook, formData, {
-                    headers: formData.getHeaders(),
-                    maxContentLength: Infinity,
-                    maxBodyLength: Infinity,
-                    timeout: 300000
-                });
+                await sendBackupToWebhook(config.webhook, outputGzPath, `${datetime}.sql.gz`);
 
                 logger('sucesso', `Backup salvo na nuvem!`);
 
@@ -191,14 +207,14 @@ const startBackup = async () => {
         }
 
         const now = new Date();
-        const nextBackupDate = new Date(now.getTime() + config.interval * 60 * 60 * 1000);
+        const nextBackupDate = new Date(now.getTime() + config.interval * MINUTE_IN_MS);
         const nextBackupDatetime = `${nextBackupDate.getHours()}:${nextBackupDate.getMinutes()}`;
 
         logger('aviso',`Próximo backup será às: ${nextBackupDatetime}`);
 
         if (backupTimeout) clearTimeout(backupTimeout);
 
-        backupTimeout = setTimeout(startBackup, config.interval * 60 * 60 * 1000);
+        backupTimeout = setTimeout(startBackup, config.interval * MINUTE_IN_MS);
 
     } catch (error) {
         logger('negado',`Erro ao realizar o backup Base: ${database}\n${error.message}`);
@@ -207,6 +223,6 @@ const startBackup = async () => {
     }
 }
 
-backupTimeout = setTimeout(startBackup, config.interval * 60 * 60 * 1000);
+backupTimeout = setTimeout(startBackup, config.interval * MINUTE_IN_MS);
 
 RegisterCommand("backupdb", startBackup);

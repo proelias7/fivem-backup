@@ -1,5 +1,5 @@
 {
     "webhook": "",
     "retention": 10,
-    "interval": 4
+    "interval": 60
 }
